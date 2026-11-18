@@ -1,18 +1,22 @@
-# --- .NET Build Output & Visual Studio ---
+# .NET / C#
 [Bb]in/
 [Oo]bj/
-.vs/
-*.user
-*.userosscache
 *.suo
-.dotnet/
-.duğ/
-
-# --- Konfigurasi Lokal & Secret ---
+*.user
+appsettings.json
 appsettings.Development.json
-.env
-.env.local
 
-# --- OS Specific ---
+# Next.js / Node.js
+node_modules/
+.next/
+out/
+build/
+.env
+.env*.local
+
+# Editor & System Files
+.vs/
+.vscode/
+.idea/
 .DS_Store
 Thumbs.db

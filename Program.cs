@@ -14,12 +14,18 @@ builder.Services.AddSwaggerGen();
 // 2. Konfigurasi CORS untuk Vercel
 builder.Services.AddCors(options =>
 {
-    options.AddPolicy("AllowVercelFrontend", policy =>
-    {
-        policy.WithOrigins("https://personalfinance-tau.vercel.app")
-              .AllowAnyHeader()
-              .AllowAnyMethod();
-    });
+    options.AddPolicy("AllowFrontend",
+        policy =>
+        {
+            policy.WithOrigins(
+                    "https://personal-finance-frontend-inky.vercel.app",
+                    "https://personal-finance-frontend-q2li551yj-fazry.vercel.app",
+                    "http://localhost:3000"
+                )
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); // Jika menggunakan cookie/auth token
+        });
 });
 
 // 3. Konfigurasi JWT Authentication
@@ -57,7 +63,7 @@ builder.Services.AddDbContext<AppDbContext>(options =>
 var app = builder.Build();
 
 // 5. Urutan Middleware (PENTING: CORS harus di paling atas sebelum request diproses)
-app.UseCors("AllowVercelFrontend");
+app.UseCors("AllowFrontend");
 
 // Middleware File Statis & Swagger
 app.UseStaticFiles();

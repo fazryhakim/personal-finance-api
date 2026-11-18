@@ -52,7 +52,7 @@ namespace PersonalFinanceAPI.Controllers
             int userId = GetUserId();
             var wallet = await _context.Wallets
                 .FirstOrDefaultAsync(w => w.Id == id && w.UserId == userId);
-                
+
             if (wallet == null) return NotFound();
 
             _context.Wallets.Remove(wallet);
@@ -70,32 +70,46 @@ namespace PersonalFinanceAPI.Controllers
                 return BadRequest(new { message = "Dompet asal dan tujuan tidak boleh sama." });
 
             int userId = GetUserId();
-            using var dbTransaction = await _context.Database.BeginTransactionAsync();
+
+            // Dapatkan execution strategy untuk mendukung retry policy SQL Server
+            var strategy = _context.Database.CreateExecutionStrategy();
+
             try
             {
-                var sourceWallet = await _context.Wallets
-                    .FirstOrDefaultAsync(w => w.Id == dto.SourceWalletId && w.UserId == userId);
-                var targetWallet = await _context.Wallets
-                    .FirstOrDefaultAsync(w => w.Id == dto.TargetWalletId && w.UserId == userId);
+                return await strategy.ExecuteAsync(async () =>
+                {
+                    using var dbTransaction = await _context.Database.BeginTransactionAsync();
+                    try
+                    {
+                        var sourceWallet = await _context.Wallets
+                            .FirstOrDefaultAsync(w => w.Id == dto.SourceWalletId && w.UserId == userId);
+                        var targetWallet = await _context.Wallets
+                            .FirstOrDefaultAsync(w => w.Id == dto.TargetWalletId && w.UserId == userId);
 
-                if (sourceWallet == null || targetWallet == null)
-                    return NotFound(new { message = "Dompet asal atau tujuan tidak ditemukan." });
+                        if (sourceWallet == null || targetWallet == null)
+                            return (IActionResult)NotFound(new { message = "Dompet asal atau tujuan tidak ditemukan." });
 
-                if (sourceWallet.Balance < dto.Amount)
-                    return BadRequest(new { message = "Saldo dompet asal tidak mencukupi." });
+                        if (sourceWallet.Balance < dto.Amount)
+                            return (IActionResult)BadRequest(new { message = "Saldo dompet asal tidak mencukupi." });
 
-                // Proses mutasi saldo
-                sourceWallet.Balance -= dto.Amount;
-                targetWallet.Balance += dto.Amount;
+                        // Proses mutasi saldo
+                        sourceWallet.Balance -= dto.Amount;
+                        targetWallet.Balance += dto.Amount;
 
-                await _context.SaveChangesAsync();
-                await dbTransaction.CommitAsync();
+                        await _context.SaveChangesAsync();
+                        await dbTransaction.CommitAsync();
 
-                return Ok(new { message = "Transfer berhasil dilakukan." });
+                        return Ok(new { message = "Transfer berhasil dilakukan." });
+                    }
+                    catch
+                    {
+                        await dbTransaction.RollbackAsync();
+                        throw;
+                    }
+                });
             }
             catch (Exception ex)
             {
-                await dbTransaction.RollbackAsync();
                 return StatusCode(500, new { message = "Terjadi kesalahan saat memproses transfer.", error = ex.Message });
             }
         }

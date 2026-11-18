@@ -53,6 +53,21 @@ namespace PersonalFinanceAPI.Controllers
                 return BadRequest(new { message = "Dompet tidak ditemukan atau bukan milik akun Anda." });
             }
 
+            // Validasi dan Perbarui Saldo Dompet Berdasarkan Jenis Transaksi
+            // Type 0 = Pemasukan (Income), Type 1 = Pengeluaran (Expense)
+            if ((int)transaction.Type == 1) // atau jika enum Anda bernama Expense, gunakan (int)transaction.Type == ...
+            {
+                if (wallet.Balance < transaction.Amount)
+                {
+                    return BadRequest(new { message = $"Saldo dompet '{wallet.Name}' tidak mencukupi." });
+                }
+                wallet.Balance -= transaction.Amount;
+            }
+            else if ((int)transaction.Type == 0)
+            {
+                wallet.Balance += transaction.Amount;
+            }
+
             _context.Transactions.Add(transaction);
             await _context.SaveChangesAsync();
 
@@ -65,9 +80,23 @@ namespace PersonalFinanceAPI.Controllers
         {
             int userId = GetUserId();
             var transaction = await _context.Transactions
+                .Include(t => t.Wallet)
                 .FirstOrDefaultAsync(t => t.Id == id && t.UserId == userId);
 
             if (transaction == null) return NotFound();
+
+            // Kembalikan/Rollback saldo dompet saat transaksi dihapus
+            if (transaction.Wallet != null)
+            {
+                if ((int)transaction.Type == 1)
+                {
+                    transaction.Wallet.Balance += transaction.Amount;
+                }
+                else if ((int)transaction.Type == 0)
+                {
+                    transaction.Wallet.Balance -= transaction.Amount;
+                }
+            }
 
             _context.Transactions.Remove(transaction);
             await _context.SaveChangesAsync();
